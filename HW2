@@ -1,0 +1,113 @@
+#PCA
+data <- HRDataset_v13
+
+data_drop <- c("Employee_Name","EmpID","Zip","DateofTermination","ManagerName",
+               "LastPerformanceReview_Date","DaysLateLast30","TermReason","DOB",
+               "DateofHire","Position","MaritalDesc","State")
+data1 <- data[,!(names(data)%in%data_drop)]
+
+#Convert all categorical and ordinal predictor variables data to dummy variables
+results <- fastDummies::dummy_cols(data1)
+
+#remove nonnumeric columns
+data_drop1 <-c("CitizenDesc","HispanicLatino","Sex","RaceDesc","EmploymentStatus",
+               "Department","RecruitmentSource","PerformanceScore")
+data2 <- results[,!(names(results)%in%data_drop1)]
+
+#Perform rank two principal component analysis on your predictor variables
+#scatterplot the two components; use your target variable to determine the 
+#point character/point color/point size etc. 
+data2 <- scale(data2)
+newdata <- na.omit(data2) #remove missing vals
+prcomp_1<-prcomp(newdata)
+
+summary(prcomp_1)
+str(prcomp_1)
+
+head(prcomp_1$x)
+
+#graphs
+plot(prcomp_1)
+screeplot(prcomp_1)
+biplot(prcomp_1)
+#scatterplot
+autoplot(object = prcomp_1,data = newdata, colour = "PositionID")
+autoplot(object = prcomp_1,data = newdata, colour = "Termd")
+
+factoextra::fviz_eig(prcomp_1)
+
+factoextra::fviz_pca_ind(prcomp_1,col.ind = "cos2",
+                         gradient.cols = c("00AFBB","#E7B800", "#FC4E07"),
+                         repel = TRUE) #RED OUTSIDE OF MODEL
+
+#farther to the right more important for pc1
+factoextra::fviz_pca_var(X = prcomp_1, col.var = "contrib",
+                         gradient.cols = c("00AFBB","#E7B800", "#FC4E07"),
+                         repel = TRUE) 
+
+factoextra::get_eigenvalue(prcomp_1)
+
+#tSNE
+#remove nonnumeric columns
+data_drop1SNE <-c("CitizenDesc","HispanicLatino","Sex","RaceDesc","EmploymentStatus",
+               "Department","RecruitmentSource","PerformanceScore")
+dataSNE <- results[,!(names(results_SNE)%in%data_drop1SNE)]
+dataSNE <- na.omit(dataSNE)
+
+#set seed for duplication
+set.seed(1908)
+Rtsne_1 <- Rtsne::Rtsne(dataSNE)
+y <- dataSNE$Termd
+plot(Rtsne_1$Y, col = y, pch = as.character(y))
+plot(Rtsne_1$Y, col = "red", pch = as.character(y))
+
+#convergence
+Rtsne_1$itercosts
+plot(Rtsne_1$itercosts)
+
+#Perform nonnegative matrix factorization with two topics on your predictor
+#variables You will need to change the range of predictor variables with 
+#negative values, scatterplot the two basis vectors; use your target variable 
+#to determine the point character/point color/point size etc. (25 points)
+
+data <- HRDataset_v13
+
+data_drop <- c("Employee_Name","EmpID","Zip","DateofTermination","ManagerName",
+               "LastPerformanceReview_Date","DaysLateLast30","TermReason","DOB",
+               "DateofHire","Position","MaritalDesc","State")
+data1NMF <- data[,!(names(data)%in%data_drop)]
+
+#Convert all categorical and ordinal predictor variables data to dummy variables
+resultsNMF <- fastDummies::dummy_cols(data1NMF)
+
+#remove nonnumeric columns
+data_drop1NMF <-c("CitizenDesc","HispanicLatino","Sex","RaceDesc","EmploymentStatus",
+               "Department","RecruitmentSource","PerformanceScore")
+data2NMF <- results[,!(names(resultsNMF)%in%data_drop1NMF)]
+data2NMF <- na.omit(data2NMF) #remove missing vals
+
+#removes 0s
+mat <- as.matrix(data2NMF)
+i0 <- which(colSums(mat) == 0)
+i_na <- which(colSums(is.na(mat)) > 0)
+
+#run NMF
+nmf_1 <- NMF::nmf(mat[, -c(i0, i_na)], rank = 2)
+nmf_1             
+    
+basis_nmf <- NMF::basis(nmf_1)
+coef_nmf <- NMF::coef(nmf_1)
+
+#NMF matrix
+View(basis_nmf)
+dim(basis_nmf)
+dim(coef_nmf)
+
+colnames(basis_nmf) <- c("arg_1","arg_2")
+rownames(coef_nmf) <- c("arg_1", "arg_2")
+
+round(head(basis_nmf))
+round(head(coef_nmf[,1:5]),3)
+
+profplot(coef_nmf)
+profplot(basis_nmf)
