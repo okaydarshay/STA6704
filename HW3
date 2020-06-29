@@ -1,0 +1,104 @@
+View(HRDataset_v13)
+data_drop <- c("Employee_Name","EmpID","Zip","DateofTermination","ManagerName",
+               "LastPerformanceReview_Date","DaysLateLast30","TermReason","DOB",
+               "DateofHire","Position","MaritalDesc","State","MarriedID")
+data1 <- data[,!(names(data)%in%data_drop)]
+
+hrdata <- na.omit(data1) #remove missing vals
+
+str(hrdata) #view data types
+
+hrdata[] <- lapply(hrdata, factor) # the "[]" keeps the dataframe structure
+col_names <- names(hrdata)
+
+str(hrdata) #check data type
+
+#fdata = factor(hrdata) #factor data
+
+#View(fdata)
+#df = data.frame(fdata) #create data frame
+#View(df)
+#df <- na.omit(df)
+
+#interval
+#interval <- discretize(hrdata, methods = "interval", breaks = 3, ordered = TRUE)
+
+#quantile
+#quant <- discretize(df, methods = "quantile", breaks = 3, ordered = TRUE)
+
+ #disctretization
+list_M <- lapply(
+  X = c("interval","quantile","hartemink"),
+  FUN = function(method) discretize(
+    data = hrdata,
+    method = method,
+    breaks = 4,
+    ordered = TRUE
+  )
+)
+names(list_M) <- c("interval","quantile","hartemink")
+lapply(X = list_M,FUN = summary)
+
+#bayesian network
+v_algorithms <- c(
+  "pc.stable","gs","iamb","fast.iamb","inter.iamb","iamb.fdr",
+  "mmpc","si.hiton.pc","hpc","hc","tabu","rsmax2","mmhc","h2pc",
+  "aracne","chow.liu"
+  )
+list_bnlearn <- list()
+
+for(j in v_algorithms) for(k in names(list_M)) try({
+  list_bnlearn[[j]][[k]] <- do.call(
+    what = j,
+    args = list(x = list_M[[k]])
+  )
+  M_arcs <- arcs(list_bnlearn[[j]][[k]])
+  for(l in 1:nrow(M_arcs)){
+    list_bnlearn[[j]][[k]] <- set.arc(
+      x = list_bnlearn[[j]][[k]],
+      from = M_arcs[l,1],
+      to = M_arcs[l,2],
+      check.cycles = FALSE,
+      check.illegal = FALSE
+      )
+    list_bnlearn[[j]][[k]] <- choose.direction(
+      x = list_bnlearn[[j]][[k]],
+      arc = M_arcs[l,],
+      data = list_M[[k]]
+      )
+    }
+  },silent = TRUE)
+
+#scoring
+M_score <- matrix(
+  data = NA, #change?
+  nrow = length(v_algorithms),
+  ncol = length(list_M),
+  )
+rownames(M_score) <- v_algorithms
+colnames(M_score) <- names(list_M)
+
+for(j in v_algorithms) for(k in names(list_M)) try({
+  M_score[j,k] <- score(
+    x = list_bnlearn[[j]][[k]],
+    data = list_M[[k]],
+    type = "bic"
+    )
+  })
+for(j in rownames(M_score)) M_score <- M_score[,order(M_score[j,])]
+for(j in colnames(M_score)) M_score <- M_score[order(M_score[,j]),]
+M_score
+
+BiocManager::install("Rgraphviz")
+#contstraint based PC
+model_pc <- pc.stable(hrdata)
+graphviz.plot(model_pc)
+
+#score
+model_tabu <- tabu(df)
+graphviz.plot(model_tabu)
+
+model_hc <- hc(df)
+graphviz.plot(model_hc)
+#hybrid
+model_hybrid 
