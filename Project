@@ -1,0 +1,62 @@
+#import packages
+library(ggplot2) 
+library(readr) 
+library('dplyr')
+library('tidyr')
+library(ggplot2)
+library(lubridate)
+library(highcharter)
+
+#import dataset
+data <- HRDataset_v13 
+
+#remove columns
+data_drop <- c("Employee_Name","EmpID","Zip","DateofTermination","ManagerName",
+               "LastPerformanceReview_Date","DaysLateLast30","DOB",
+               "DateofHire","MaritalDesc","State")
+data <- data[,!(names(data)%in%data_drop)]
+
+data <- na.omit(data) #remove missing vals
+
+#still employed by position
+employed <- data %>%
+  filter(TermReason=="N/A - still employed") %>%
+  group_by(Sex,Position) %>%
+  summarise(Total=n())
+hchart(employed,type = "column",hcaes(x=Position,y=Total, group=Sex)) %>%
+  hc_add_theme(hc_theme_google()) %>%
+  hc_title(text="Current Employees by Position")
+
+#termd by position
+unemployed <- data %>%
+  filter(TermReason!="N/A - still employed") %>%
+  group_by(Sex,PositionID) %>%
+  summarise((Total=n()))
+
+#recruitment
+recruit <-data %>% group_by(RecruitmentSource) %>% summarise(Total=n()) %>% 
+  arrange(desc(Total))
+ggplot(recruit,aes(reorder(RecruitmentSource,Total),y=Total)) +
+  geom_bar(stat="identity") +
+  coord_flip() +
+  ggtitle("Recruitment Source")
+
+#D&I Job recruiting
+dni <- data %>% group_by(FromDiversityJobFairID) %>% summarise(Total=n()) %>%
+  arrange(desc(Total))
+ggplot(dni, aes(reorder(FromDiversityJobFairID,Total),y=Total)) +
+  geom_bar(stat = "identity") + 
+  scale_fill_brewer(palette="Blues") +
+  ggtitle("Diversity Job Fair Hiring")
+
+#m/f from diversity
+head(data%>%filter(FromDiversityJobFairID=="1") %>%count(Sex))
+
+#termd by position
+leftcompany <- data %>%
+  filter(Termd == "1") %>%
+  group_by(Sex,Position) %>%
+  summarise(Total=n())
+hchart(leftcompany,type = "column",hcaes(x=Position,y=Total, group=Sex)) %>%
+  hc_add_theme(hc_theme_google()) %>%
+  hc_title(text="Terminated Employees by Position")
