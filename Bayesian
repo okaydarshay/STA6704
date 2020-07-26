@@ -1,0 +1,105 @@
+#import packages
+library(readr)
+library(dplyr)
+library(randomForest)
+library(ggplot2)
+library(bnlearn)
+
+#import data
+data(alarm, package="bnlearn")
+
+#run
+bnModels <- c(
+  "pc.stable","gs","iamb","fast.iamb","inter.iamb","iamb.fdr",
+  "mmpc","si.hiton.pc","hpc", "mmhc","rsmax2","h2pc", "hc", "tabu","chow.liu","aracne" 
+)
+bnModelsList <- list()
+for(j in bnModels) try({ 
+  bnModelsList[[j]] <- bn.cv(
+    data = alarm,
+    bn = j,
+    k = 2,
+    runs = 2
+  )
+},silent = TRUE)
+
+bnModelsList #results
+
+#constraint algo
+mmpcModel <- mmpc(alarm)
+iambModel <- iamb.fdr(alarm)
+
+#hybrid
+rsmax2Model <- rsmax2(alarm)
+
+#score
+tabuModel <- tabu(alarm)
+
+#local discovery
+chowliuModel <- chow.liu(alarm)
+
+#whitelist and directed
+plot(iamb.fdr(alarm)) #returns error
+whitelist <- data.frame(
+  from = c("TPR","TPR","FIO2","SHNT","SHNT","ANES","TPR","CO"),
+  to = c("APL","CCHL","PVS","PMB","PVS","CCHL","BP","BP")
+)
+
+mmpc2 <-mmpc(x=alarm, whitelist = whitelist)
+iambModel2 <- iamb.fdr(x=alarm,whitelist = whitelist) #no error
+
+#Select a network-score
+scoreTypes <- c('k2', 'bde', 'loglik', 'aic', 'bic', 'bds', 'mbde', 'bdla')
+scoreList <- list()
+for(j in scoreTypes){ 
+  scoreList[[j]] <- bnlearn::score(rsmax2Model, alarm, type = j)
+}
+
+#1.	Run bnlearn::score() on each model.
+modelScores <- list()
+modelScores <- c(bnlearn::score(tabuModel, alarm, type = "loglik"))
+modelScores <- c(modelScores, bnlearn::score(iambModel2, alarm, type = "loglik"))
+modelScores <- c(modelScores, bnlearn::score(rsmax2Model, alarm, type = "loglik"))
+modelScores <- c(modelScores, bnlearn::score(chowliuModel, alarm, type="loglik"))
+
+modelScores
+
+#Visualize your final model
+graphviz.plot(tabuModel, layout = "neato")
+
+#actual model
+#modelstring = paste0("[HIST|LVF][CVP|LVV][PCWP|LVV][HYP][LVV|HYP:LVF][LVF]",
+#                     "[STKV|HYP:LVF][ERLO][HRBP|ERLO:HR][HREK|ERCA:HR][ERCA][HRSA|ERCA:HR][ANES]",
+#                     "[APL][TPR|APL][ECO2|ACO2:VLNG][KINK][MINV|INT:VLNG][FIO2][PVS|FIO2:VALV]",
+#                     "[SAO2|PVS:SHNT][PAP|PMB][PMB][SHNT|INT:PMB][INT][PRSS|INT:KINK:VTUB][DISC]",
+#                     "[MVS][VMCH|MVS][VTUB|DISC:VMCH][VLNG|INT:KINK:VTUB][VALV|INT:VLNG]",
+#                     "[ACO2|VALV][CCHL|ACO2:ANES:SAO2:TPR][HR|CCHL][CO|HR:STKV][BP|CO:TPR]")
+#dag = model2network(modelstring)
+#graphviz.plot(dag)
+
+#question 4
+str(alarm)
+set.seed(202)
+
+library(Hmisc)
+library(party)
+library(MLmetrics)
+library(caret)
+library(Metrics)
+library(ISLR)
+library(caTools)
+
+alarmSample <- sample.split(alarm, SplitRatio = .75)
+
+alarmTrain <- subset(alarm, alarmSample == TRUE)
+alarmTest <- subset(alarm, alarmSample == FALSE)
+
+alarmFit <- bn.fit(
+  x = tabuModel,
+  data = alarmTrain,
+)
+alarmPred_Train <- predict(alarmFit, node = "INT", data = alarmTrain)
+confusionMatrix(alarmPred_Train, alarmTrain$INT)
+alarmPred <- predict(alarmFit, node = "INT", data = alarmTest)
+alarmPred
+confusionMatrix(alarmPred, alarmTest$INT)
